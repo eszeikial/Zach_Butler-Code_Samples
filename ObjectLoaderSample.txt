@@ -1,0 +1,54 @@
+	/*
+		This is part of an OBJ loader class that is to be implemented in my on-going Graphics programming  class.
+		After loading all the Vertex, Normal, and UV data for the mesh, I realized that it wasn't as simple as 
+		putting together the mesh with Vertex[0],Norm[0], and UV[0], they weren't necessarily ordered!
+		
+		In this snipped I am creating new vectors and doing some trickery with array indices to get things
+		ordered nicely.
+		
+	*/
+		
+		
+		vector<XMFLOAT4> normalsAtIndexLoc; // x,y,z stores normal data, [w] stores number of normals to be averaged.
+		vector<UINT> uvsAtIndexLoc; // x,y stores UV data. 
+
+		for (int i = 0; i < vertices.size(); i++) // LOOP to set all the values in array to default values. should all be overwritten.
+		{
+			normalsAtIndexLoc.push_back(XMFLOAT4());
+			uvsAtIndexLoc.push_back(0);
+		}
+
+		//This for loop converts sets up these new vectors with the data sorted to match the vector indices.
+		for(int i = 0; i < indicesWithData.size(); i++)
+		{
+			int vInd = indicesWithData[i].index; // get index of vertex.
+			int nInd = indicesWithData[i].vn; //index of normals for normVect
+			int uInd = indicesWithData[i].vt; // index of UV for UVvect
+
+			uvsAtIndexLoc[vInd] = indicesWithData[i].vt; // sets the INDEX (not value) for the UV in terms of vertex indices.
+
+			normalsAtIndexLoc[vInd].x += vertNorm[nInd].x;
+			normalsAtIndexLoc[vInd].y += vertNorm[nInd].y;
+			normalsAtIndexLoc[vInd].z += vertNorm[nInd].z;
+			normalsAtIndexLoc[vInd].w ++; //increment number of normals 
+		}
+
+
+		//File has been read from, now create the mesh and compute normals.
+		vector<Vertex> allData;
+		for(int i = 0; i < vertices.size(); i++)
+		{
+			XMFLOAT3 normal;
+			normal.x = normalsAtIndexLoc[i].x / normalsAtIndexLoc[i].w;
+			normal.y = normalsAtIndexLoc[i].y / normalsAtIndexLoc[i].w;
+			normal.z = normalsAtIndexLoc[i].z / normalsAtIndexLoc[i].w;
+
+			//UV coordinates aren't working ATM. Will set that up later.
+			Vertex v = { vertices[i], vertTexCoord[uvsAtIndexLoc[i]], normal};
+			allData.push_back(v);
+		}
+
+		//No need to return. was passed as reference.
+		*meshToCreate = new Mesh(allData.data(),allData.size(),indices.data(),indices.size(), device);
+
+		return true;

@@ -1,0 +1,147 @@
+/*
+	In this code snippet I have implemented the ever popular A* algorithm for an AI simulation.
+	
+	Created in Unity C#.
+*/
+
+	//This function sets the data values for each waypoint along the path.
+	public List<Vector3> GetPath(Vector3 position,Vector3 goal){
+
+		List<WayPoint> openList = new List<WayPoint>(); // positions that are possible to get to, but not examined yet
+		List<WayPoint> closedList = new List<WayPoint>();
+
+		WayPoint endGoal = manager.getWayPointNear(goal);
+		WayPoint start = manager.getWayPointNear(position);
+
+		//If there is a straight unobstructed line from start to endpoint...
+		Vector3 heading = (goal - position);
+		if(!Physics.Raycast(position,heading.normalized,heading.magnitude,layerMask))
+		{
+			//Debug.Log ("unobstructed");
+			List<Vector3> returnThis = new List<Vector3>();
+			returnThis.Add(goal);
+			return returnThis;
+		}
+		else
+			//Debug.Log ("obstructed");
+
+		start.distToReach = 0; // set to start point.
+		openList.Add(start);
+
+
+		//Before looping begins, calculate all node's linear distance to goal using gamemanager.
+		foreach(WayPoint wayP in manager.allWayPoints)
+		{
+			wayP.distGoal = Vector3.Distance(wayP.transform.position,endGoal.transform.position);
+		}
+
+	
+		while(openList.Count != 0){
+
+			// Find open node with the best F value on the list. 
+			WayPoint best = null;
+
+			// Finds the node closest to goal that we can reach.
+			foreach(WayPoint wp in openList){
+
+				//if best hasn't been set yet
+				if(best == null){
+					best = wp;
+				}
+
+				//if the current "Best" has a higher cost than the new one, 
+				//set best = to the new WP instead.
+				else if(best.distGoal > wp.distGoal){
+					best = wp;
+				}
+			}
+			//The cheapest node has been selected.
+			openList.Remove (best); // Remove it from the openlist. We still have reference to it here in local scope (while loop).
+
+			//For each connection it knows about, calculate values.
+			foreach(WayPoint.Connection c in best.otherWayPoints)
+			{
+				WayPoint thisWP = c.wp;
+
+				if(thisWP == endGoal)
+				{
+					break; // will break from main while loop. Ends the search.
+				}
+
+				//Do calculations for thisWP.
+				float newFCost = best.distToReach + thisWP.distGoal + c.totalDist;
+				bool newCheaperValue = false; // flag to determine which list this node should be placed on.
+
+				//if the newly calculated cost is cheaper than the previous one,
+				if(newFCost < thisWP.distToReach)
+				{
+					thisWP.distToReach = newFCost; // set it to the cheaper one.
+					newCheaperValue = true;
+				}
+
+				if(openList.Contains(thisWP))
+				{
+					//do nothing.
+				}
+				else if(closedList.Contains(thisWP))
+				{
+					if(newCheaperValue == true) // if it was updated to a cheaper score, remove it from closed list and re-add to open.
+					{
+						closedList.Remove(thisWP);
+						openList.Add(thisWP);
+					}
+				}
+				else
+				{
+					//Not in any lists yet. Add to open list
+					openList.Add (thisWP);
+				}
+
+			}//END foreach
+			closedList.Add (best);
+
+		}//END while
+
+		//Reverse algorithm to return path.
+		List<Vector3> path = new List<Vector3>();
+
+		//after reaching the goal waypoint, go to this final location.(list is reversed later)
+		path.Add (goal);
+
+		//Start from the goal, and work our way back to start.
+		WayPoint currentPoint = endGoal;
+
+		//Debug.DrawLine(goal, endGoal.transform.position,Color.yellow,5.0f); //draw the path from start spot -> first Node
+		//Debug.DrawLine(position, start.transform.position,Color.yellow,5.0f); //draw the path from start spot -> first Node
+
+		while(currentPoint != start)
+		{
+			path.Add(currentPoint.transform.position);
+
+			WayPoint nextPoint = null;
+			//Finds the best nextPoint for this iteration.
+			foreach(WayPoint.Connection c in currentPoint.otherWayPoints)
+			{
+				if (nextPoint == null)
+					nextPoint = c.wp;
+				else if(c.wp.distToReach < nextPoint.distToReach)
+					nextPoint = c.wp;
+
+				//This overrides the previous else/if block
+				if (c.wp == start)
+					nextPoint = c.wp;
+			}
+
+			//Draw the connection set the best next to current.
+			//Debug.DrawLine(currentPoint.transform.position,nextPoint.transform.position,Color.yellow,5.0f); //draw the path
+			currentPoint = nextPoint;
+
+		}
+		path.Add (currentPoint.transform.position); //Add the final point.
+
+		path.Reverse ();
+
+
+
+		return path;
+	} //END METHOD

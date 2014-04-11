@@ -1,0 +1,188 @@
+/*
+	This is a snippet of code from a game created with a group, Demon's Dungeon.
+	In this section of code I am using Prim's algorithm
+	http://en.wikipedia.org/wiki/Prim's_algorithm
+	
+	We wanted our maze to be generated randomly, but still wanted some control over
+	the generation. Prim's alg gave us a good starting point for the maze, guaranteeing 
+	that the player could navigate from start to finish. 
+	
+	Created in Unity C#.
+*/
+void OnServerInitialized()
+	{
+	    //---------------------------------------//
+        //-----------------Prims-----------------//
+        //---------------------------------------//
+        
+        //Everything in here is only done by the server.
+        
+        //all spaces and possible starting Loc for algorithm.
+        space[][] allSpaces;
+        List<space> possibleStarts = new List<space>(); // List containing all the nodes that can be started from.
+        
+        
+        //create a randomly generated weighted graph.
+        allSpaces = new space[mazeSize][];
+        for(int i = 0; i < mazeSize; i++)
+        {
+                allSpaces[i] = new space[mazeSize];
+                for(int j = 0; j < mazeSize; j++)
+                {
+                        allSpaces[i][j].weight = rng.Next()%100;
+                        allSpaces[i][j].numAdjacentInPath = 0;
+                        allSpaces[i][j].partOfPath = false;
+                        allSpaces[i][j].row = i;
+                        allSpaces[i][j].col = j;
+                }
+        }
+        
+        //Generation Loop.
+        bool isGenerated = false;
+        int numRuns = 0;
+        int curRow = 0;
+        int curCol = 0;
+        
+        List<space> avaliableMoves = new List<space>(); //list for possible moves THIS turn. (used later).
+        
+        //Kinda cheating I guess. First move is made automatically.
+        //Add the starting move to the list of starting moves.
+        possibleStarts.Add(allSpaces[0][0]);
+
+        allSpaces[0][0].partOfPath = true;
+        allSpaces[0][1].numAdjacentInPath++;
+        allSpaces[1][0].numAdjacentInPath++;
+        
+        while(!isGenerated)
+        {
+                numRuns++; //Debug
+                
+                //Debug.Log("running loop number " + numRuns );+
+                //Debug.Log("++++++ running loop number " + numRuns + ", avaliable starts: " + possibleStarts.Count+" ++++++");
+                
+                
+                //Choose a starting space.
+                int choice = rng.Next()%possibleStarts.Count;
+                curRow = possibleStarts[choice].row;
+                curCol = possibleStarts[choice].col;
+                
+                
+                //Debug.Log("starting at row "+ curRow + ", col "+ curCol);
+                
+                //Add all possible points to path.
+                for(int i = 1; i < 5; i++) // this for loop gets all nearby points.
+                {
+                        int row = 0;
+                        int col = 0;
+                        
+                        //Sloppy I know.
+                        switch(i)
+                        {
+                        case 1: row = curRow; col = curCol + 1; break;
+                        case 2: row = curRow; col = curCol - 1; break;
+                        case 3: row = curRow + 1; col = curCol; break;
+                        case 4: row = curRow - 1; col = curCol; break;
+                        }
+                        
+                        if(row >= 0 && row < mazeSize && col >= 0 && col < mazeSize)//make sure its in bounds.
+                        {
+                                if(allSpaces[row][col].numAdjacentInPath == 1 && !allSpaces[row][col].partOfPath) //This means it is near only one other used space! (which is what we want)
+                                {
+                                        //Debug.Log("adding space at row" + row + ", col "+ col + "to possible moves.");
+                                        avaliableMoves.Add(allSpaces[row][col]); // adds the space onto a list of possible spaces
+                                }
+                        }
+                        
+                }//All possible moves have been added.
+                
+                
+                //If there are moves avaliable...
+                if(avaliableMoves.Count != 0)
+                {
+                        //Debug.Log ("There are moves avaliable");
+                        //choose one by weight and make the move.
+                        for(int i = 0; i < avaliableMoves.Count; i++) // count should be 1-3
+                        {
+                                if(avaliableMoves[i].weight < moveChoice.weight)
+                                {
+                                        moveChoice = avaliableMoves[i];
+                                }
+                        }
+                        
+                        //Debug.Log("chose to move to space at row "+moveChoice.row + "and col "+moveChoice.col + ", added it to graph");
+                        //Move has been chosen. Add it to graph.
+                        possibleStarts.Add(moveChoice);
+                        
+                        
+                        for(int i = 1; i < 5; i++) // this for loop gets all nearby points.
+                        {
+                                
+                                int r = moveChoice.row;
+                                int c = moveChoice.col;
+                                allSpaces[r][c].partOfPath = true; // move choice becomes part of graph
+                                
+                                switch(i)
+                                {
+                                case 1: r++; break;
+                                case 2: r--; break;
+                                case 3: c++; break;
+                                case 4: c--; break;
+                                }
+                                
+                                //Not going out of bounds...
+                                if(c>=0 && c<mazeSize && r>=0 && r<mazeSize)
+                                {
+                                        allSpaces[r][c].numAdjacentInPath++; // spaces near choice have numAdjacent incremented.
+                                }
+                                
+                        }
+                        
+                        if((avaliableMoves.Count-1) == 0)
+                        {
+                                //Debug.Log("after moving there were no more moves, removing row " + curRow +", col "+curCol +" from possible starts");
+                                //that was our last move from this spot.        
+                                //Remove used space from starting list.
+                                possibleStarts.RemoveAt(choice);
+                        }
+                }
+                else // No moves?
+                {
+                        //Debug.Log("no moves, removing space at row "+curRow + ",col " + curCol+ " from possible starts");
+                        //Remove used space from starting list.
+                        possibleStarts.RemoveAt(choice);
+                }
+                
+                
+                //If there are no more moves, end generation.
+                if(possibleStarts.Count == 0) //possibleStarts.Count == 0
+                {
+                        //GGWP generation
+                        //Debug.Log("finished with " + numRuns + "runs!");
+                        isGenerated = true; // ends loop.
+                }
+                
+                avaliableMoves.Clear();
+                
+        }//End while. At this point, all spaces that are used have the "partofpath" bool set to true.
+        
+        
+        
+        foreach(space[] ss in allSpaces)
+        {
+                foreach(space s in ss)
+                {
+                        if(s.partOfPath)
+                        {
+                                WallScript ws = WallArray[s.row][s.col].GetComponent<WallScript>();
+                                wallState[s.row][s.col] = 1; // keep track of state.
+                                ws.SetHeight(1); //Set wall down.
+                        }
+                        else{
+                                WallScript ws = WallArray[s.row][s.col].GetComponent<WallScript>();
+                                wallState[s.row][s.col] = 0; // keep track of state.
+                                ws.SetHeight(0); //Set wall down.
+                        }
+                }
+        }
+
+	}
